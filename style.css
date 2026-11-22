@@ -1378,3 +1378,35 @@ input, textarea, select, [contenteditable="true"] {
   .track-picker { display: inline-flex; }
   .statusbar { justify-content: space-between; }
 }
+
+@media (max-width: 639px) {
+  .path-units {
+    display: flex;
+    gap: 7px;
+    margin: 12px 0 0;
+    padding: 2px 1px 7px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-inline: contain;
+  }
+  .path-units::-webkit-scrollbar { display: none; }
+  .path-unit-tab {
+    display: grid;
+    min-width: 68px;
+    min-height: 40px;
+    flex: 0 0 auto;
+    place-items: center;
+    gap: 0;
+    padding: 5px 8px;
+    border: 1px solid var(--line);
+    border-bottom-width: 3px;
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 9px;
+  }
+  .path-unit-tab b { color: var(--quiet); font-size: 8px; }
+  .path-unit-tab.selected { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
+  .path-unit-tab.selected b { color: var(--accent); }
+  .path-page::before { top: 138px; }
+}
