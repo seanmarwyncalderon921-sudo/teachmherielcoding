@@ -56,6 +56,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST for Sean’s coach.' });
   if (!process.env.GROQ_API_KEY) return res.status(500).json({ error: 'Sean’s AI is not set up yet. You can still use every lesson offline.' });
 
+  try {
+
   const body = parseBody(req.body);
   const mode = body.mode === 'drill' ? 'drill' : 'hint';
   const track = text(body.track, 80) || 'coding';
@@ -119,5 +121,9 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: error.message || 'Sean could not answer right now.' });
   } finally {
     clearTimeout(timeout);
+  }
+  } catch (error) {
+    console.error('Sean AI function error:', error);
+    return res.status(500).json({ error: error?.message || 'Sean’s AI function failed before it could answer.' });
   }
 }
