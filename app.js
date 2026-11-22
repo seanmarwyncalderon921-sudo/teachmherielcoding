@@ -1168,6 +1168,21 @@
     return pyodidePromise;
   }
 
+  function formatJSONError(error) {
+    const detail = error?.message || 'The text could not be parsed.';
+    return `JSON is not valid: ${detail} Use double quotes around text, for example {"text":"the page c"}.`;
+  }
+
+  async function readAIResponse(response) {
+    const raw = await response.text();
+    let data = {};
+    try { data = raw ? JSON.parse(raw) : {}; } catch { data = {}; }
+    if (!response.ok) {
+      throw new Error(data.error || `Sean's AI request failed (${response.status}).`);
+    }
+    return data;
+  }
+
   async function executeCode(language, source, frame, output) {
     output.textContent = '';
     if (language === 'html') {
@@ -1190,7 +1205,7 @@
         output.textContent = 'Valid JSON ✓';
         return true;
       } catch (error) {
-        output.textContent = error.message;
+        output.textContent = formatJSONError(error);
         return false;
       }
     }
@@ -1278,7 +1293,7 @@
         output.textContent = `Valid JSON ✓\n\n${JSON.stringify(json, null, 2)}`;
         return { ok: true, json, logs: [] };
       } catch (error) {
-        output.textContent = error.message;
+        output.textContent = formatJSONError(error);
         return { ok: false, error: error.message, logs: [] };
       }
     }
@@ -1477,7 +1492,7 @@
       editor.dispatchEvent(new Event('input', { bubbles: true }));
       if (output) output.textContent = 'JSON formatted. Run it to validate.';
     } catch (error) {
-      if (output) output.textContent = `JSON could not be formatted: ${error.message}`;
+      if (output) output.textContent = `JSON could not be formatted. ${formatJSONError(error)}`;
     }
   }
 
@@ -1521,8 +1536,7 @@
         cache: 'no-store',
         body: JSON.stringify({ mode: 'hint', track: activeTrack.name, stepType: why ? 'why explanation' : step.type, language: step.language || activeTrack.id, prompt: why ? `Explain briefly why this rule works: ${step.why || step.prompt || step.title}` : (step.prompt || step.text || step.takeaway), topic: step.title, code: work, output: $('#lesson-output')?.textContent || '' })
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Sean could not answer right now.');
+      const data = await readAIResponse(response);
       const answer = typeof data.answer === 'string' ? { hint: data.answer, nextStep: '' } : data.answer;
       if (!answer || typeof answer.hint !== 'string') throw new Error('Sean sent an empty reply. Try once more.');
       renderSeanReply({ hint: answer.hint, nextStep: answer.nextStep || '' }, panelSelector);
@@ -1574,8 +1588,7 @@
           topic: `${languageName} sandbox`, code: editor.value, output: output?.textContent || ''
         })
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Sean could not answer right now.');
+      const data = await readAIResponse(response);
       const answer = typeof data.answer === 'string' ? { hint: data.answer, nextStep: '' } : data.answer;
       if (!answer || typeof answer.hint !== 'string') throw new Error('Sean sent an empty reply. Try once more.');
       renderSeanReply({ hint: answer.hint, nextStep: answer.nextStep || '' }, '#sandbox-ai-reply');
@@ -1603,8 +1616,7 @@
         cache: 'no-store',
         body: JSON.stringify({ mode: 'drill', track: activeTrack.name, prompt: step.prompt || step.text, topic: step.title, language: step.language || activeTrack.id })
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Sean could not make a drill right now.');
+      const data = await readAIResponse(response);
       const drill = typeof data.drill === 'string' ? JSON.parse(data.drill) : data.drill;
       if (!drill || drill.type !== 'code_challenge' || !drill.prompt || !drill.language || !['html', 'css', 'javascript', 'json', 'python'].includes(drill.language)) throw new Error('Sean sent an incomplete drill. Try again in a moment.');
       drill.rule = { kind: 'changed', original: String(drill.starter || '').trim() };
