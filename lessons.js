@@ -7,6 +7,96 @@ const LOVE_MILESTONES = [
   { id: 'track-first', reqType: 'lessons', threshold: 5, title: 'Five lessons down', note: 'You followed an idea all the way through.', reward: 'A date of your choice' }
 ];
 
+/* The five starter lessons above are hand-authored. These plain-data builders
+   expand each track to a complete 10-unit curriculum. They emit only
+   JSON-serializable lesson records; grading remains in the shared runner. */
+const CURRICULUM = {
+  html: {
+    unit: ['Text & structure', 'Links & media', 'Lists & tables', 'Forms', 'Semantic pages', 'Accessible patterns', 'Embedded content', 'Page metadata', 'Reusable components', 'Small projects'],
+    topics: ['Semantic landmarks', 'Headings in order', 'Emphasis and quotations', 'Description lists', 'Table captions', 'Table headers', 'Form labels', 'Required fields', 'Select menus', 'Button types', 'Details and summary', 'Figure captions', 'Audio controls', 'Video captions', 'Responsive images', 'Navigation menus', 'Article structure', 'Time and dates', 'Accessible names', 'Page language', 'Document title', 'Meta description', 'Data attributes', 'Custom data', 'Skip links', 'Field groups', 'Radio choices', 'Checkbox choices', 'Textarea fields', 'Input hints', 'Autocomplete', 'Form validation', 'Download links', 'Email links', 'Telephone links', 'External links', 'Ordered lists', 'Nested lists', 'Table footers', 'Column groups', 'Progress meter', 'Disclosure widgets', 'Search forms', 'Status messages', 'Image alternatives', 'Decorative images', 'SVG images', 'Iframe titles', 'Source order', 'Page sections', 'Reusable cards', 'Breadcrumbs', 'Dialogs', 'Accessible buttons', 'Language changes', 'Ruby annotations', 'Code samples', 'Keyboard focus', 'Landmark labels', 'Contact information', 'Address elements', 'Citations', 'Abbreviations', 'Marking changes', 'Meter values', 'Output elements', 'Form actions', 'Hidden labels', 'Heading levels', 'Main content', 'Footer content', 'Header content', 'Navigation links', 'List descriptions', 'Table scope', 'Cell spanning', 'Form grouping', 'Input types', 'Date inputs', 'Range inputs', 'Color inputs', 'File inputs', 'Image maps', 'Object fallback', 'Template elements', 'Slot basics', 'Web components', 'Print structure', 'Microdata basics', 'Open Graph basics', 'Favicon links', 'Preload hints', 'Base URLs', 'Noscript content', 'Landmark review', 'Page outline', 'Portfolio page', 'Recipe page', 'Profile page', 'Final page review']
+  },
+  css: {
+    unit: ['Color & type', 'Spacing & borders', 'Selectors', 'Flexbox', 'Grid', 'Responsive design', 'States & motion', 'Layout patterns', 'Polish', 'Small projects'],
+    topics: ['CSS variables', 'Color contrast', 'HSL colors', 'Font stacks', 'Line height', 'Font weight', 'Text decoration', 'Text wrapping', 'Box sizing', 'Logical properties', 'Border styles', 'Outline styles', 'Shadow restraint', 'Opacity', 'Attribute selectors', 'Child selectors', 'Sibling selectors', 'Pseudo classes', 'Pseudo elements', 'Specificity', 'Cascade layers', 'Inheritance', 'Flex direction', 'Flex wrapping', 'Flex alignment', 'Flex growth', 'Order and gaps', 'Grid columns', 'Grid rows', 'Grid gaps', 'Grid areas', 'Auto placement', 'Minmax sizing', 'Responsive units', 'Media queries', 'Container queries', 'Fluid type', 'Viewport units', 'Aspect ratio', 'Object fit', 'Position relative', 'Position sticky', 'Stacking order', 'Overflow control', 'Scroll behavior', 'Focus-visible', 'Hover states', 'Disabled states', 'Transitions', 'Reduced motion', 'Transforms', 'Keyframe basics', 'Print styles', 'Dark color scheme', 'Light color scheme', 'Form styling', 'Button states', 'Placeholder color', 'Selection styling', 'List markers', 'Counters', 'Nested variables', 'Fallback values', 'Custom properties', 'Clamp sizing', 'Fit-content', 'Intrinsic sizing', 'Text columns', 'Word breaking', 'Hyphenation', 'RTL direction', 'Writing modes', 'Grid alignment', 'Subgrid idea', 'Flex basis', 'Auto margins', 'Sticky headers', 'Centered layouts', 'Card layouts', 'Navigation bars', 'Split panes', 'Safe areas', 'Touch targets', 'Scrollbar styling', 'Backdrop filters', 'Blend modes', 'Clip paths', 'Masks overview', 'CSS nesting', 'Selector functions', ':is and :where', ':not selectors', 'Has selector', 'Supports queries', 'Layer ordering', 'Specificity review', 'Responsive card', 'Profile layout', 'Accessible form', 'Final style review']
+  },
+  javascript: {
+    unit: ['Values & variables', 'Choices & loops', 'Arrays & objects', 'Functions', 'DOM basics', 'Events', 'Async work', 'Data handling', 'Browser APIs', 'Small projects'],
+    topics: ['let and reassignment', 'Primitive values', 'Template literals', 'Number conversion', 'String methods', 'Boolean logic', 'Comparison operators', 'Truthy values', 'Nullish values', 'Default parameters', 'Ternary expressions', 'Switch statements', 'While loops', 'Break and continue', 'Array creation', 'Array indexing', 'Array methods', 'Map arrays', 'Filter arrays', 'Reduce arrays', 'Object properties', 'Object shorthand', 'Nested objects', 'Destructuring', 'Spread syntax', 'Rest parameters', 'Function returns', 'Arrow functions', 'Scope basics', 'Closures overview', 'Callbacks', 'Errors and try', 'Throwing errors', 'JSON parsing', 'JSON stringifying', 'Query selectors', 'Text content', 'Class lists', 'Create elements', 'Append children', 'Remove elements', 'Event listeners', 'Event targets', 'Form submit', 'Input values', 'Keyboard events', 'Event delegation', 'Timers', 'Promise basics', 'Async functions', 'Fetch requests', 'Response parsing', 'Await and errors', 'Local storage', 'Session storage', 'URL parameters', 'Date formatting', 'Math helpers', 'Regular expressions', 'Set collections', 'Map collections', 'Optional chaining', 'Nullish coalescing', 'Modules overview', 'Import and export', 'Default exports', 'Sorting arrays', 'Finding values', 'Some and every', 'Flat arrays', 'Copying objects', 'Immutable updates', 'Object entries', 'Object keys', 'String includes', 'Slice and substring', 'Number formatting', 'Intl basics', 'Document ready', 'Accessibility updates', 'Focus management', 'Debouncing', 'Throttling overview', 'Clipboard API', 'Intersection observer', 'Media queries API', 'Custom events', 'Abort controller', 'Promise all', 'Promise race', 'Error messages', 'Guard clauses', 'Pure functions', 'Testing ideas', 'Data validation', 'Safe DOM text', 'Reusable renderer', 'Small counter', 'Filtered list', 'Form feedback', 'Final browser project']
+  },
+  json: {
+    unit: ['JSON shape', 'Strings & numbers', 'Objects', 'Arrays', 'Nested data', 'Validation', 'Applications', 'Interchange', 'Careful editing', 'Small projects'],
+    topics: ['Object keys', 'String values', 'Number values', 'Boolean values', 'Null values', 'Array values', 'Nested objects', 'Nested arrays', 'Whitespace rules', 'Quoted keys', 'Escape characters', 'Unicode escapes', 'Decimal numbers', 'Negative numbers', 'Exponent notation', 'Empty objects', 'Empty arrays', 'Array ordering', 'Duplicate keys', 'Trailing commas', 'Comments are invalid', 'Root values', 'Property lookup', 'Array indexing', 'Mixed arrays', 'Object collections', 'Consistent records', 'Optional properties', 'Required properties', 'Type checking', 'Schema idea', 'Enum values', 'Minimum lengths', 'Maximum lengths', 'Numeric bounds', 'Unique items', 'Nested validation', 'Error locations', 'Parse errors', 'Stringify output', 'Pretty printing', 'Compact output', 'Escaped newlines', 'Slash characters', 'Date strings', 'ISO timestamps', 'URL strings', 'Email strings', 'ID fields', 'Configuration files', 'API responses', 'Request payloads', 'Localization data', 'Product records', 'Profile records', 'Settings records', 'Feature flags', 'Pagination data', 'Error objects', 'Status fields', 'Metadata fields', 'Map-like objects', 'Array of objects', 'Filtering records', 'Sorting records', 'Optional nulls', 'Empty values', 'Safe parsing', 'Parse fallback', 'Reviver overview', 'Replacer overview', 'Deep nesting', 'Data normalization', 'Schema versions', 'Backward compatibility', 'Forward compatibility', 'JSON Lines', 'NDJSON basics', 'Unicode text', 'Large integers', 'Precision limits', 'Boolean checks', 'Null checks', 'Array checks', 'Object checks', 'Key existence', 'Unknown fields', 'Sensitive values', 'Input validation', 'Response validation', 'Config review', 'Syntax review', 'Recipe data', 'Reading list data', 'Quiz data', 'Theme settings', 'Final data review']
+  },
+  python: {
+    unit: ['Values & output', 'Choices & loops', 'Collections', 'Functions', 'Strings & files', 'Errors', 'Modules', 'Data patterns', 'Python tools', 'Small projects'],
+    topics: ['Integer values', 'Float values', 'Boolean values', 'None values', 'Variable updates', 'Naming conventions', 'String methods', 'String slicing', 'f-string formatting', 'Rounding numbers', 'Comparison operators', 'and or not', 'Membership checks', 'if expressions', 'Nested conditions', 'for range loops', 'while loops', 'Loop control', 'Enumerate items', 'Zip collections', 'List creation', 'List indexing', 'List slicing', 'List methods', 'List comprehensions', 'Tuple values', 'Set values', 'Dictionary values', 'Dictionary lookup', 'Dictionary methods', 'Nested dictionaries', 'Unpacking values', 'Function arguments', 'Default arguments', 'Keyword arguments', 'Return values', 'Local scope', 'Docstrings', 'Lambda overview', 'Sorting with key', 'Any and all', 'Sum and min', 'Enumerate dictionaries', 'String splitting', 'String joining', 'Strip whitespace', 'Format specifications', 'Path objects', 'Read text files', 'Write text files', 'With statements', 'CSV overview', 'JSON module', 'Exception handling', 'Specific exceptions', 'Raise exceptions', 'Finally blocks', 'Assertions', 'Import modules', 'Standard library', 'Random module', 'Math module', 'Datetime module', 'Counter collection', 'Defaultdict', 'Iterators', 'Generators', 'Yield values', 'Type hints', 'Optional types', 'Dataclasses', 'Class basics', 'Instance methods', 'Class attributes', 'Inheritance idea', 'Properties', 'Special methods', 'Context managers', 'Comprehension review', 'Argument unpacking', 'Keyword unpacking', 'Recursive functions', 'Big O intuition', 'Testing with assert', 'Unit test idea', 'Debug print', 'Traceback reading', 'Virtual environments', 'Package imports', 'Command line args', 'Environment values', 'Safe input', 'Input validation', 'Text report', 'Score calculator', 'Shopping list', 'Word counter', 'Final Python project']
+  }
+};
+
+function buildCurriculum() {
+for (const track of TRACKS) {
+  const curriculum = CURRICULUM[track.id];
+  for (let lessonNumber = track.lessons.length + 1; lessonNumber <= 100; lessonNumber += 1) {
+    const topic = curriculum.topics[lessonNumber - 6];
+    const unitNumber = Math.ceil(lessonNumber / 10);
+    const sample = track.id === 'html'
+      ? { snippet: `<section>\n  <h2>${topic}</h2>\n  <p>A useful detail.</p>\n</section>`, blank: 'section', chips: ['section', 'span', 'div'], starter: '<main>\n\n</main>', rule: { kind: 'html', checks: [{ selector: 'h2', property: 'text', test: 'nonempty' }] }, output: '' }
+      : track.id === 'css'
+        ? { snippet: `.note {\n  color: #db2777;\n  padding: 12px;\n}`, blank: 'color', chips: ['color', 'src', 'href'], starter: '.note {\n\n}', rule: { kind: 'css', checks: [{ selector: '.note', property: 'color', test: 'notempty' }] }, output: '' }
+        : track.id === 'javascript'
+          ? { snippet: `const topic = "${topic}";\nconsole.log(topic);`, blank: 'const', chips: ['const', 'print', 'style'], starter: '', rule: { kind: 'js', sourceIncludes: ['console.log'], outputIncludes: [topic] }, output: topic }
+          : track.id === 'json'
+            ? { snippet: `{\n  "topic": "${topic}",\n  "ready": true\n}`, blank: '"topic"', chips: ['"topic"', 'topic', 'topic:'], starter: '{}', rule: { kind: 'json', checks: [{ path: 'topic', test: 'type', value: 'string' }, { path: 'ready', test: 'equals', value: true }] }, output: '' }
+            : { snippet: `topic = "${topic}"\nprint(topic)`, blank: 'print', chips: ['print', 'echo', 'show'], starter: '', rule: { kind: 'python', sourceIncludes: ['print('], outputIncludes: [topic] }, output: topic };
+    track.lessons.push({
+      id: `${track.id}-${lessonNumber}`,
+      number: lessonNumber,
+      unit: unitNumber,
+      title: topic,
+      steps: [
+        { type: 'concept', title: `A closer look at ${topic}`, text: `This lesson explores ${topic}. Read the example, then try a small version of the same idea.`, code: sample.snippet, takeaway: `Practice ${topic} in one small, clear example.`, sean: 'One small idea at a time.' },
+        { type: 'fill_blank', title: `Recognize ${topic}`, prompt: `Choose the token used in this ${track.name} example.`, parts: track.id === 'html' ? ['<', { blank: 0 }, '>content</', { blank: 1 }, '>'] : track.id === 'css' ? ['.note { ', { blank: 0 }, ': #db2777; }'] : track.id === 'javascript' ? ['const topic = ', { blank: 0 }, ';\nconsole.log(topic);'] : track.id === 'json' ? ['{ ', { blank: 0 }, ': "Mheriel", "ready": true }'] : ['topic = "Mheriel"\n', { blank: 0 }, '(topic)'], answers: track.id === 'html' ? ['section', 'section'] : track.id === 'javascript' ? [`"${topic}"`] : [sample.blank], chips: track.id === 'html' ? ['section', 'span', 'section', 'div'] : track.id === 'javascript' ? [`"${topic}"`, '"Mheriel"', 'topic'] : [...sample.chips] },
+        { type: 'reorder', title: 'Put the example together', prompt: 'Tap the lines in the order they belong.', lines: track.id === 'html' ? ['</section>', '<h2>Topic</h2>', '<section>'] : track.id === 'css' ? ['}', '  color: #db2777;', '.note {'] : track.id === 'javascript' ? ['console.log(topic);', `const topic = "${topic}";`] : track.id === 'json' ? ['}', `  "topic": "${topic}"`, '{'] : [`print(topic)`, `topic = "${topic}"`], solution: track.id === 'html' || track.id === 'css' || track.id === 'json' ? [2, 1, 0] : [1, 0] },
+        { type: 'code_challenge', title: `Try ${topic}`, prompt: track.id === 'html' ? `Add an h2 element to practice ${topic}.` : track.id === 'css' ? `Add a color declaration to practice ${topic}.` : track.id === 'javascript' ? `Log the text “${topic}” to practice ${topic}.` : track.id === 'json' ? `Create valid JSON with a topic string and ready boolean.` : `Print the text “${topic}” to practice ${topic}.`, language: track.id, starter: sample.starter, rule: sample.rule, success: `You practiced ${topic}. Nice work.`, retryHint: `Try a small example of ${topic}.` }
+      ]
+    });
+  }
+}
+
+for (const track of TRACKS) {
+  for (let index = 0; index < track.lessons.length; index += 1) {
+    track.lessons[index].number = index + 1;
+    track.lessons[index].unit = Math.floor(index / 10) + 1;
+  }
+}
+}
+
+function pillTokenKind(text) {
+  const value = String(text || '').trim();
+  if (/^(const|let|var|def|function|if|else|elif|for|while|return|print|console\.log)\b/.test(value)) return 'fn';
+  if (/^[A-Za-z_$][\w$]*\s*=/.test(value) || /^(const|let|var|def)\b/.test(value)) return 'var';
+  if (/^(true|false|null|undefined|[-+]?\d+(?:\.\d+)?|["'`])/.test(value) || /["'`]$/.test(value)) return 'val';
+  if (/^[{}()[\],.;:+*/<>=-]/.test(value) || /[{}()[\],.;:+*/<>=-]$/.test(value)) return 'op';
+  return 'blank';
+}
+
+function normalizePillChallenges() {
+  for (const track of TRACKS) {
+    for (const lesson of track.lessons) {
+      for (const step of lesson.steps) {
+        if (step.type !== 'reorder') continue;
+        const sourceLines = Array.isArray(step.lines) ? step.lines : [];
+        step.type = 'pill_challenge';
+        step.lines = sourceLines.map((text, index) => ({ kind: pillTokenKind(text), text: String(text), index }));
+        step.answers = Array.isArray(step.solution) ? [...step.solution] : sourceLines.map((_, index) => index);
+        step.chips = step.lines.map(line => ({ text: line.text, index: line.index }));
+        step.why = step.why || `The order matters because each token builds on the one before it. This sequence makes the ${track.name} example readable and runnable.`;
+        delete step.solution;
+      }
+    }
+  }
+}
+
 const TRACKS = [
   {
     id: 'html', name: 'HTML', icon: '◇', tagline: 'Shape a page', description: 'Headings, links, pictures, lists, and useful little controls.',
@@ -15,7 +105,7 @@ const TRACKS = [
         id: 'html-1', title: 'Headings & paragraphs', steps: [
           { type: 'concept', title: 'Give a page a start', text: 'A heading gives the page a title. A paragraph holds a little more to say.', code: '<h1>For Mheriel</h1>\n<p>A little note.</p>', takeaway: 'Use headings for structure, then add a paragraph.', sean: 'A good page can start small.' },
           { type: 'fill_blank', title: 'Choose a heading', prompt: 'Pick the tag for the main heading.', parts: ['<', { blank: 0 }, '>Mheriel</', { blank: 1 }, '>'], answers: ['h1', 'h1'], chips: ['h1', 'p', 'h1', 'div'] },
-          { type: 'reorder', title: 'Put it in order', prompt: 'Build the heading and its paragraph.', lines: ['</p>', '</h1>', '<p>A little note.</p>', '<h1>For Mheriel'], solution: [3, 1, 2, 0] },
+          { type: 'reorder', title: 'Put it in order', prompt: 'Build the heading and its paragraph.', lines: ['</p>', '</h1>', '<p>A little note.', '<h1>For Mheriel'], solution: [3, 1, 2, 0] },
           { type: 'code_challenge', title: 'Try it yourself', prompt: 'Add an h1 and, if you like, a short paragraph too.', language: 'html', starter: '<main>\n\n</main>', rule: { kind: 'html', minChecks: 1, checks: [{ selector: 'h1', property: 'text', test: 'nonempty' }, { selector: 'p', property: 'text', test: 'nonempty' }] }, success: 'A clear heading is in place. Nice work.', retryHint: 'Add a heading or a short paragraph to keep going.' }
         ]
       },
@@ -234,3 +324,6 @@ const TRACKS = [
     ]
   }
 ];
+
+buildCurriculum();
+normalizePillChallenges();

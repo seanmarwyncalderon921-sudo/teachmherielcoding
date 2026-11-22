@@ -6,6 +6,7 @@
     xp: 0,
     streak: 0,
     lastDate: null,
+    activityDates: [],
     completed: [],
     notes: [],
     theme: 'dark',
@@ -54,6 +55,7 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+  const renderSpeechText = value => escapeHTML(value).replace(/`([^`]+)`/g, '<code>$1</code>');
   const trackFor = id => TRACKS.find(track => track.id === id) || TRACKS[0];
   const lessonKey = (trackId, lessonId) => `${trackId}/${lessonId}`;
   const firebaseConfigured = () => Boolean(window.FirebaseSync?.isFirebaseConfigured?.() || window.FirebaseSync?.configured?.());
@@ -69,6 +71,7 @@
         ...saved,
         xp: Number.isFinite(Number(saved.xp)) ? Math.max(0, Number(saved.xp)) : 0,
         streak: Number.isFinite(Number(saved.streak)) ? Math.max(0, Number(saved.streak)) : 0,
+        activityDates: Array.isArray(saved.activityDates) ? saved.activityDates.filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item)).slice(-90) : [],
         theme: saved.theme === 'light' ? 'light' : 'dark',
         track: TRACKS.some(track => track.id === saved.track) ? saved.track : DEFAULTS.track,
         links: { ...DEFAULTS.links, ...(saved.links || {}) },
@@ -87,6 +90,7 @@
   const state = readState();
   let activeTrack = trackFor(state.track);
   let activeView = 'path';
+  let selectedUnit = 0;
   let session = null;
   let sandboxOpen = false;
   let customSandboxOpen = false;
@@ -95,6 +99,7 @@
   let pyodidePromise = null;
   let toastTimer = 0;
   let syncTimer = 0;
+  let installPrompt = null;
   let runnerBusy = false;
   let runSequence = 0;
   let pendingFrameRun = null;
@@ -139,11 +144,11 @@
     if (icon) icon.textContent = TRACK_ICONS[activeTrack.id] || activeTrack.icon;
     if (themeButton) {
       themeButton.innerHTML = `<span aria-hidden="true">${state.theme === 'dark' ? '☼' : '☾'}</span>`;
-      themeButton.setAttribute('aria-label', `Switch to ${state.theme === 'dark' ? 'Cotton Candy' : 'Midnight Rose'} theme`);
+      themeButton.setAttribute('aria-label', `Switch to ${state.theme === 'dark' ? 'Light' : 'Dark'} theme`);
     }
     document.documentElement.dataset.theme = state.theme;
     const themeColor = $('meta[name="theme-color"]');
-    if (themeColor) themeColor.content = state.theme === 'dark' ? '#120d1b' : '#fdf7fa';
+    if (themeColor) themeColor.content = state.theme === 'dark' ? '#0b1b28' : '#f4f9fb';
   }
 
   function awardXP(amount) {
@@ -155,6 +160,7 @@
       state.streak = state.lastDate === todayKey(yesterday) ? state.streak + 1 : 1;
       state.lastDate = today;
     }
+    state.activityDates = [...new Set([...(state.activityDates || []), today])].sort().slice(-90);
     state.xp += amount;
     save();
     checkMilestones();
@@ -184,19 +190,9 @@
 
   function seanMarkup(message, mood = 'idle', compact = false) {
     const figureClass = compact ? 'sean-figure' : 'sean-mini';
-    return `<span class="${figureClass}" data-mood="${escapeHTML(mood)}" role="img" aria-label="Sean the coding companion">
-      <svg viewBox="0 0 64 72" aria-hidden="true">
-        <path d="M32 7V3" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/><circle cx="32" cy="3" r="2.5" fill="var(--accent)"/>
-        <rect x="10" y="10" width="44" height="32" rx="11" fill="var(--surface-raised)" stroke="var(--line-strong)" stroke-width="2"/>
-        <circle class="sean-eye" cx="23" cy="25" r="2.7" fill="var(--accent)"/><circle class="sean-eye" cx="41" cy="25" r="2.7" fill="var(--accent)"/>
-        <path class="mouth-idle" d="M27 33q5 4 10 0" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
-        <path class="mouth-happy" d="M26 31q6 9 12 0" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
-        <path class="mouth-thinking" d="M28 34h8" fill="none" stroke="var(--warning)" stroke-width="1.8" stroke-linecap="round"/>
-        <path class="mouth-celebrating" d="M25 30q7 13 14 0" fill="none" stroke="var(--gold)" stroke-width="2.2" stroke-linecap="round"/>
-        <rect x="17" y="45" width="30" height="22" rx="8" fill="var(--surface-raised)" stroke="var(--line-strong)" stroke-width="2"/>
-        <path class="chest-heart" d="M32 61s-5-3-5-6.2a2.8 2.8 0 0 1 5-1.6 2.8 2.8 0 0 1 5 1.6c0 3.2-5 6.2-5 6.2Z" fill="var(--accent)"/>
-      </svg>
-    </span>${message ? `<span class="companion-message"><strong class="sean-name">Sean</strong>${escapeHTML(message)}</span>` : ''}`;
+    return `<span class="${figureClass}" data-mood="${escapeHTML(mood)}" role="img" aria-label="Usagi the coding companion">
+      <img src="./usagi.png" alt="" aria-hidden="true">
+    </span>${message ? `<span class="companion-message"><strong class="sean-name">Usagi</strong>${escapeHTML(message)}</span>` : ''}`;
   }
 
   function safeLink(value, fallback) {
@@ -210,7 +206,7 @@
 
   function renderCodeShortcutBar(editorId, runAction) {
     const tokens = CODE_SHORTCUTS.map(([label, value, description]) => `<button type="button" class="code-shortcut" data-shortcut-insert="${escapeHTML(value)}" aria-label="Insert ${escapeHTML(description)}">${escapeHTML(label)}</button>`).join('');
-    return `<div class="code-shortcuts" role="group" aria-label="Code shortcuts" data-editor-target="${escapeHTML(editorId)}">${tokens}<span class="code-shortcut-divider" aria-hidden="true"></span><button type="button" class="code-shortcut code-shortcut-run" data-shortcut-run="${escapeHTML(runAction)}" aria-label="Run code">▶ Run</button><button type="button" class="code-shortcut code-shortcut-sean" data-shortcut-sean aria-label="Ask Sean for a hint">Sean ♥</button></div>`;
+    return `<div class="code-shortcuts" role="group" aria-label="Code shortcuts" data-editor-target="${escapeHTML(editorId)}">${tokens}<span class="code-shortcut-divider" aria-hidden="true"></span><button type="button" class="code-shortcut code-shortcut-run" data-shortcut-run="${escapeHTML(runAction)}" aria-label="Run code">▶ Run</button><button type="button" class="code-shortcut code-shortcut-sean" data-shortcut-sean aria-label="Ask Usagi for a hint">Usagi ♥</button></div>`;
   }
 
   function codeShortcutEditor(button) {
@@ -281,14 +277,23 @@
     const done = activeTrack.lessons.filter(lesson => state.completed.includes(lessonKey(activeTrack.id, lesson.id))).length;
     const focusIndex = activeTrack.lessons.findIndex(lesson => !state.completed.includes(lessonKey(activeTrack.id, lesson.id)));
     const percent = Math.round((done / activeTrack.lessons.length) * 100);
-    const lessonPath = activeTrack.lessons.map((lesson, index) => {
+    const activeUnit = Math.max(0, Math.min(9, selectedUnit));
+    const unitStart = activeUnit * 10;
+    const unitLessons = activeTrack.lessons.slice(unitStart, unitStart + 10);
+    const units = Array.from({ length: 10 }, (_, unitIndex) => {
+      const start = unitIndex * 10;
+      const completeInUnit = activeTrack.lessons.slice(start, start + 10).filter(lesson => state.completed.includes(lessonKey(activeTrack.id, lesson.id))).length;
+      return `<button class="path-unit-tab ${unitIndex === activeUnit ? 'selected' : ''}" data-unit="${unitIndex}" aria-current="${unitIndex === activeUnit ? 'step' : 'false'}"><span>Unit ${unitIndex + 1}</span><b>${completeInUnit}/10</b></button>`;
+    }).join('');
+    const lessonPath = unitLessons.map((lesson, localIndex) => {
+      const index = unitStart + localIndex;
       const finished = state.completed.includes(lessonKey(activeTrack.id, lesson.id));
       const icon = finished ? '✓' : (LESSON_ICONS[activeTrack.id]?.[index] || String(index + 1));
       const stop = `<article class="path-stop ${index % 2 ? 'path-stop-right' : 'path-stop-left'} ${index === focusIndex ? 'path-stop-next' : ''}">
         <button class="lesson-node ${finished ? 'done' : ''} ${index === focusIndex ? 'focus' : ''}" data-lesson="${escapeHTML(lesson.id)}" aria-label="${finished ? 'Review' : 'Start'} lesson ${index + 1}: ${escapeHTML(lesson.title)}">
           <span class="node-number">${icon}</span>
         </button>
-        <div class="node-copy"><small>LESSON 0${index + 1} · ${finished ? 'DONE' : 'OPEN'}</small><b>${escapeHTML(lesson.title)}</b><span>${lesson.steps.length} short steps</span></div>
+        <div class="node-copy"><small>LESSON ${String(index + 1).padStart(2, '0')} · ${finished ? 'DONE' : 'OPEN'}</small><b>${escapeHTML(lesson.title)}</b><span>${lesson.steps.length} short steps</span></div>
       </article>`;
       const sean = index === 2 ? `<div class="path-companion">${seanMarkup('Pick any step. I’m right here.', 'happy', true)}</div>` : '';
       return stop + sean;
@@ -296,18 +301,61 @@
     $('#main').innerHTML = `<section class="path-page" aria-labelledby="path-title">
       <header class="unit-banner">
         <div class="unit-copy">
-          <p class="eyebrow">Unit 1 · ${escapeHTML(activeTrack.name)}</p>
-          <h1 id="path-title">${escapeHTML(TRACK_TAGLINES[activeTrack.id] || activeTrack.tagline)}</h1>
-          <p>Five small lessons · all open</p>
+          <p class="eyebrow">Unit ${activeUnit + 1} · ${escapeHTML(activeTrack.name)}</p>
+          <h1 id="path-title">${escapeHTML(curriculumTitle(activeTrack, activeUnit))}</h1>
+          <p>Lessons ${unitStart + 1}–${unitStart + 10} · all open</p>
         </div>
         <div class="unit-progress" style="--progress:${percent}%" aria-label="${percent}% complete"><strong>${percent}%</strong></div>
       </header>
+      <div class="path-units" aria-label="Choose a unit">${units}</div>
       <div class="path-caption"><h2>Your lesson path</h2><button class="love-path-button" data-view="notes"><span aria-hidden="true">♥</span><b>Love Notes</b><small>${state.notes.length}/${LOVE_MILESTONES.length}</small></button></div>
-      <div class="node-path" aria-label="Five open lessons">${lessonPath}</div>
+      <div class="node-path" aria-label="Lessons ${unitStart + 1} to ${unitStart + 10}">${lessonPath}</div>
       <p class="path-footer">Choose a node to start. You can visit them in any order.</p>
     </section>`;
     updateNavigation();
     renderStatus();
+  }
+
+  function renderStreak() {
+    activeView = 'streak';
+    session = null;
+    const today = new Date();
+    const monday = new Date(today);
+    const dayIndex = (today.getDay() + 6) % 7;
+    monday.setDate(today.getDate() - dayIndex);
+    monday.setHours(0, 0, 0, 0);
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label, index) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + index);
+      const key = todayKey(date);
+      const isToday = key === todayKey(today);
+      const checked = (state.activityDates || []).includes(key);
+      return `<div class="streak-day ${checked ? 'checked' : ''} ${isToday ? 'today' : ''}"><span>${label}</span><b aria-label="${checked ? 'Complete' : 'Not complete'}">${checked ? '✓' : '·'}</b></div>`;
+    }).join('');
+    $('#main').innerHTML = `<section class="streak-page" aria-labelledby="streak-title">
+      <div class="streak-celebration-card">
+        <div class="streak-flame" aria-hidden="true">♨</div>
+        <p class="eyebrow">Your little rhythm</p>
+        <h1 id="streak-title">${state.streak} day${state.streak === 1 ? '' : 's'} streak</h1>
+        <p class="streak-message">Every small session counts. Keep the warm little flame going.</p>
+        <div class="streak-week" aria-label="This week's coding activity">${days}</div>
+        <button class="primary-button streak-keep-going" data-action="keep-going">KEEP GOING</button>
+      </div>
+      <div class="streak-sean">${seanMarkup('I’m cheering for the next tiny step.', 'happy', true)}</div>
+    </section>`;
+    updateNavigation();
+    renderStatus();
+  }
+
+  function curriculumTitle(track, unitIndex) {
+    const titles = {
+      html: ['Text & structure', 'Links & media', 'Lists & tables', 'Forms', 'Semantic pages', 'Accessible patterns', 'Embedded content', 'Page metadata', 'Reusable components', 'Small projects'],
+      css: ['Color & type', 'Spacing & borders', 'Selectors', 'Flexbox', 'Grid', 'Responsive design', 'States & motion', 'Layout patterns', 'Polish', 'Small projects'],
+      javascript: ['Values & variables', 'Choices & loops', 'Arrays & objects', 'Functions', 'DOM basics', 'Events', 'Async work', 'Data handling', 'Browser APIs', 'Small projects'],
+      json: ['JSON shape', 'Strings & numbers', 'Objects', 'Arrays', 'Nested data', 'Validation', 'Applications', 'Interchange', 'Careful editing', 'Small projects'],
+      python: ['Values & output', 'Choices & loops', 'Collections', 'Functions', 'Strings & files', 'Errors', 'Modules', 'Data patterns', 'Python tools', 'Small projects']
+    };
+    return titles[track.id]?.[unitIndex] || track.tagline;
   }
   function getCurrentStep() {
     if (!session) return null;
@@ -355,15 +403,21 @@
         <section class="fill-tray" aria-label="Fill tray"><div class="fill-tray-heading"><h2>Fill tray</h2><small>Tap a token to use it</small></div><div class="choice-chips" role="group" aria-label="Code tokens">${step.chips.map((chip, index) => `<button class="choice-chip" data-chip-index="${index}" draggable="${usedChips.has(index) ? 'false' : 'true'}" ${usedChips.has(index) ? 'disabled' : ''}>${escapeHTML(chip)}</button>`).join('')}</div></section>
         <div class="fill-actions"><button class="secondary-button" data-action="clear-fill">Clear</button><button class="primary-button" data-action="check-fill">Check</button></div>
         <p class="feedback" id="feedback" aria-live="polite"></p>`;
-    } else if (step.type === 'reorder') {
+    } else if (step.type === 'pill_challenge') {
       session.order ||= [];
-      const placed = new Set(session.order);
-      body = `<div class="reorder-flow">
-          <section class="fill-tray reorder-fill-tray"><div class="fill-tray-heading"><h2>Fill tray</h2><small>Tap a line to add it</small></div><div class="line-pool" role="group" aria-label="Available code lines">${step.lines.map((line, index) => placed.has(index) ? '' : `<button class="reorder-line tray-line" data-pool-index="${index}"><code>${escapeHTML(line)}</code><span aria-hidden="true">+</span></button>`).join('') || '<p class="sort-empty">All lines placed.</p>'}</div></section>
-          <section class="answer-tray"><div class="fill-tray-heading"><h2>Your order</h2><small>Tap a line to send it back</small></div><div class="ordered-lines" role="group" aria-label="Lines in your answer">${session.order.map((lineIndex, position) => `<button class="reorder-line placed" data-ordered-position="${position}" aria-label="Remove line ${position + 1}"><span class="line-rank">${position + 1}</span><code>${escapeHTML(step.lines[lineIndex])}</code><span aria-hidden="true">×</span></button>`).join('') || '<p class="sort-empty">Your answer will show here.</p>'}</div></section>
-        </div>
-        <div class="reorder-actions"><span class="step-hint" id="order-status">${session.order.length} of ${step.lines.length} lines placed.</span><button class="primary-button" data-action="check-reorder">Check order</button></div>
-        <p class="feedback" id="feedback" aria-live="polite"></p>`;
+      const used = new Set(session.order);
+      const card = step.answers.map((_, position) => {
+        const lineIndex = session.order[position];
+        const line = Number.isInteger(lineIndex) ? step.lines[lineIndex] : null;
+        return `<div class="pill-code-line"><span class="code-line-number" aria-hidden="true">${position + 1}</span>${line ? `<button class="token-pill ${escapeHTML(line.kind)}" draggable="true" data-pill-slot="${position}" data-pill-token="${lineIndex}" data-ordered-position="${position}" aria-label="Move or remove ${escapeHTML(line.text)}">${escapeHTML(line.text)}</button>` : `<button class="token-pill blank-pill" data-pill-slot="${position}" aria-label="Drop a token in slot ${position + 1}">tap a token</button>`}</div>`;
+      }).join('');
+      const tray = step.chips.map((chip, index) => {
+        const chipText = typeof chip === 'string' ? chip : chip.text;
+        const chipIndex = typeof chip === 'string' ? index : (chip.index ?? index);
+        const selected = used.has(chipIndex);
+        return selected ? `<span class="token-tray-slot" aria-label="Used token">${escapeHTML(chipText)}</span>` : `<button class="token-tray-chip" draggable="true" data-pill-index="${chipIndex}">${escapeHTML(chipText)}</button>`;
+      }).join('');
+      body = `<section class="pill-challenge" aria-label="Pill token challenge"><div class="exercise-code-head"><span class="language-pill">${escapeHTML(({ javascript: 'js' })[activeTrack.id] || activeTrack.id)}</span><small>Tap tokens to fill the numbered code</small></div><div class="pill-code-card" role="group" aria-label="Numbered code card">${card}</div><div class="token-tray" role="group" aria-label="Token tray">${tray}</div><div class="pill-actions"><span class="step-hint">${session.order.length} of ${step.answers.length} slots filled</span><button class="primary-button" data-action="check-pill">CHECK</button></div><div class="challenge-dock" id="challenge-dock"><p class="feedback" id="feedback" aria-live="polite"></p><button class="why-button" data-action="why">WHY?</button><button class="sean-dock-button" data-action="ask" aria-label="Ask Sean for a deeper explanation">Sean ♥</button></div><div class="why-panel" id="why-panel" hidden><p>${renderSpeechText(step.why || 'Each token has a job, and the order makes the code work together.')}</p><button class="secondary-button" data-action="ask-why">Ask Sean ♥</button><div class="why-ai-reply" id="why-ai-reply" aria-live="polite" hidden></div></div></section>`;
     } else if (step.type === 'code_challenge') {
       session.code = session.code ?? step.starter ?? '';
       body = `<div class="challenge-layout">
@@ -385,7 +439,7 @@
         <div class="lesson-top-actions"><span class="lesson-xp-badge" aria-label="${state.xp} Love XP"><span aria-hidden="true">♥</span><b id="lesson-xp-value">${state.xp}</b><small>XP</small></span><button class="lesson-ask-button" data-action="ask" aria-label="Ask Sean for a hint">Ask Sean <span aria-hidden="true">♥</span></button></div>
       </header>
       <article class="lesson-card">
-        <section class="lesson-coach-row"><div class="lesson-sean" id="coach-note" data-mood="idle">${seanMarkup('', 'idle', true)}</div><div class="prompt-bubble"><span class="prompt-label">${escapeHTML(step.type === 'concept' ? 'A small idea' : 'Your task')}</span><h1>${escapeHTML(step.title)}</h1><p>${escapeHTML(promptText)}</p><div class="sean-reaction" aria-live="polite"><strong>Sean</strong><span class="sean-reaction-text">${escapeHTML(seansOpening)}</span></div></div></section>
+        <section class="lesson-coach-row"><div class="lesson-sean" id="coach-note" data-mood="idle">${seanMarkup('', 'idle', true)}</div><div class="prompt-bubble"><span class="prompt-label">${escapeHTML(step.type === 'concept' ? 'A small idea' : 'Your task')}</span><h1>${escapeHTML(step.title)}</h1><p>${renderSpeechText(promptText)}</p><div class="sean-reaction" aria-live="polite"><strong>Sean</strong><span class="sean-reaction-text">${renderSpeechText(seansOpening)}</span></div></div></section>
         <div class="ai-reply" id="ai-reply" aria-live="polite" hidden></div>
         ${body}
       </article>
@@ -422,6 +476,7 @@
     if (activeView === 'notes') return renderNotes();
     if (activeView === 'vibes') return renderVibes();
     if (activeView === 'me') return renderMe();
+    if (activeView === 'streak') return renderStreak();
     return renderPath();
   }
 
@@ -454,6 +509,7 @@
   function renderMe() {
     activeView = 'me';
     const done = state.completed.length;
+    const installSettings = isAppInstalled() ? '' : '<div class="setting-row"><span><strong>Install this app</strong><small>Add MherielCode to your home screen for quick access.</small></span><button class="primary-button" data-action="install-app">Install app</button></div>';
     const syncConfigured = Boolean(window.FirebaseSync?.configured());
     const syncStatus = syncConfigured
       ? 'Save progress across devices with Google.'
@@ -462,11 +518,29 @@
         : 'Firebase sync did not load. Refresh the app and try again.';
     $('#main').innerHTML = `<section class="me-page"><header class="page-heading"><div><p class="eyebrow">Your little corner</p><h1>Hi, Mheriel.</h1><p>Your learning stays saved on this device.</p></div>${seanMarkup('You’re doing just fine.', 'happy', true)}</header>
       <div class="content-card"><p class="eyebrow">So far</p><div class="stats-grid"><div class="stat-tile"><b>♥ ${state.xp}</b><small>Love XP</small></div><div class="stat-tile"><b>♨ ${state.streak}</b><small>Day streak</small></div><div class="stat-tile"><b>${done}</b><small>Lessons done</small></div></div>
-        <div class="settings-list"><div class="setting-row"><span><strong>Theme</strong><small>${state.theme === 'dark' ? 'Midnight Rose' : 'Cotton Candy'}</small></span><button class="secondary-button" data-action="theme">Switch</button></div>
+        <div class="settings-list">${installSettings}<div class="setting-row"><span><strong>Theme</strong><small>${state.theme === 'dark' ? 'SideMe Dark' : 'SideMe Light'}</small></span><button class="secondary-button" data-action="theme">Switch</button></div>
         <label class="setting-row" for="sync-toggle"><span><strong>Sync between devices</strong><small>${escapeHTML(syncStatus)}</small></span><input type="checkbox" id="sync-toggle" aria-label="Enable sync between devices" ${state.sync ? 'checked' : ''}></label>
         ${syncConfigured && state.sync ? '<button class="secondary-button" data-action="sync-now">Connect or sync now</button>' : ''}</div>
       </div></section>`;
     updateNavigation();
+  }
+
+  function isAppInstalled() {
+    return window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+  }
+
+  async function installApp() {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      installPrompt = null;
+      renderMe();
+      return;
+    }
+    const isAppleMobile = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const instructions = isAppleMobile
+      ? '<ol><li>Tap the <strong>Share</strong> button in Safari.</li><li>Choose <strong>Add to Home Screen</strong>.</li><li>Tap <strong>Add</strong>.</li></ol>'
+      : '<ol><li>Open your browser menu.</li><li>Choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li><li>Confirm the install.</li></ol>';
+    showModal('Install MherielCode', 'Keep your coding path one tap away.', instructions, 'Install app');
   }
 
   function renderSandboxHome() {
@@ -591,6 +665,7 @@
   function selectTrack(id) {
     if (!TRACKS.some(track => track.id === id)) return;
     state.track = id;
+    selectedUnit = 0;
     activeTrack = trackFor(id);
     closeModal();
     renderPath();
@@ -625,10 +700,14 @@
   function showContinueButton(button) {
     if (!button?.isConnected) return;
     const next = document.createElement('button');
-    next.className = 'primary-button';
+    next.className = 'primary-button feedback-continue';
     next.dataset.action = 'continue';
-    next.innerHTML = 'Continue <span class="key-hint">Enter</span>';
-    button.replaceWith(next);
+    next.innerHTML = 'CONTINUE <span class="key-hint">Enter</span>';
+    const feedback = $('#feedback');
+    if (feedback) {
+      button.remove();
+      feedback.append(next);
+    } else button.replaceWith(next);
     next.focus({ preventScroll: true });
   }
 
@@ -872,6 +951,103 @@
       setFeedback('Not yet. Move a line back or try a different order.', 'try-again');
       updateSeanMood('thinking', 'Have another look at the order.');
     }
+  }
+
+  function placePill(index) {
+    const step = getCurrentStep();
+    if (!step || step.type !== 'pill_challenge' || !session || session.completed || session.earnedSteps.includes(session.stepIndex)) return;
+    if (session.order.includes(index)) return;
+    session.order.push(index);
+    renderLesson();
+  }
+
+  function handlePillDragStart(event) {
+    const source = event.target.closest('[data-pill-index], [data-pill-token]');
+    if (!source || getCurrentStep()?.type !== 'pill_challenge') return;
+    const index = source.dataset.pillIndex ?? source.dataset.pillToken;
+    event.dataTransfer?.setData('application/x-mheriel-pill', String(index));
+    event.dataTransfer?.setData('text/plain', String(index));
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+    source.classList.add('dragging');
+  }
+
+  function handlePillDragOver(event) {
+    const slot = event.target.closest('[data-pill-slot]');
+    if (!slot || getCurrentStep()?.type !== 'pill_challenge') return;
+    event.preventDefault();
+    slot.classList.add('drag-over');
+  }
+
+  function handlePillDrop(event) {
+    const slot = event.target.closest('[data-pill-slot]');
+    if (!slot || !session || getCurrentStep()?.type !== 'pill_challenge') return;
+    event.preventDefault();
+    const raw = event.dataTransfer?.getData('application/x-mheriel-pill') || event.dataTransfer?.getData('text/plain');
+    const tokenIndex = Number(raw);
+    const slotIndex = Number(slot.dataset.pillSlot);
+    if (!Number.isInteger(tokenIndex) || !Number.isInteger(slotIndex)) return;
+    const order = session.order.filter(index => index !== tokenIndex);
+    order.splice(Math.min(slotIndex, order.length), 0, tokenIndex);
+    session.order = order.slice(0, getCurrentStep().answers.length);
+    renderLesson();
+  }
+
+  function clearPillDragStyles() {
+    $$('.token-pill.dragging, [data-pill-slot].drag-over').forEach(item => item.classList.remove('dragging', 'drag-over'));
+  }
+
+  function returnPill(position) {
+    if (!session || session.completed || session.earnedSteps.includes(session.stepIndex)) return;
+    session.order.splice(position, 1);
+    renderLesson();
+  }
+
+  function runCompletedPill() {
+    const step = getCurrentStep();
+    if (!step || step.type !== 'pill_challenge' || !session) return;
+    const source = session.order.map(index => step.lines[index]?.text || '').join('\n');
+    const language = step.language || activeTrack.id;
+    state.drafts[language] = source;
+    sandboxLanguage = language;
+    state.sandboxLanguage = language;
+    sandboxOpen = true;
+    customSandboxOpen = false;
+    save();
+    renderSandbox();
+  }
+
+  function checkPill() {
+    const step = getCurrentStep();
+    if (!step || step.type !== 'pill_challenge' || !session || session.completed || session.earnedSteps.includes(session.stepIndex)) return;
+    const correct = JSON.stringify(session.order) === JSON.stringify(step.answers);
+    if (!correct) {
+      setFeedback('Not yet. Try the token order again.', 'try-again');
+      updateSeanMood('thinking', 'Each token has a place. Try one small move.');
+      return;
+    }
+    setFeedback('✓ Correct! +8 XP', 'good');
+    updateSeanMood('happy', 'That token sequence works.');
+    completeStep();
+    $('[data-action="check-pill"]')?.remove();
+    const feedback = $('#feedback');
+    if (feedback) {
+      const run = document.createElement('button');
+      run.className = 'secondary-button feedback-run';
+      run.dataset.action = 'run-pill';
+      run.textContent = 'RUN CODE';
+      feedback.append(run);
+      const next = document.createElement('button');
+      next.className = 'primary-button feedback-continue';
+      next.dataset.action = 'continue';
+      next.innerHTML = 'CONTINUE <span class="key-hint">Enter</span>';
+      feedback.append(next);
+      next.focus({ preventScroll: true });
+    }
+  }
+
+  function toggleWhy() {
+    const panel = $('#why-panel');
+    if (panel) panel.hidden = !panel.hidden;
   }
 
   function escapeScriptText(value) {
@@ -1259,7 +1435,7 @@
     }
   }
 
-  async function askSean(buttonOverride = null) {
+  async function askSean(buttonOverride = null, panelSelector = '#ai-reply', why = false) {
     if (activeView === 'sandbox' && (customSandboxOpen || sandboxOpen)) return askSeanInSandbox(buttonOverride);
     const step = getCurrentStep();
     const button = buttonOverride || $('[data-action="ask"]');
@@ -1268,27 +1444,27 @@
     button.disabled = true;
     button.textContent = 'Finding a hint…';
     button.setAttribute('aria-busy', 'true');
-    renderSeanReply({ state: 'loading' });
+    renderSeanReply({ state: 'loading' }, panelSelector);
     updateSeanMood('thinking', 'Let me take a look.');
     try {
       let work = '';
       if (step.type === 'code_challenge') work = $('#code-editor')?.value || '';
       else if (step.type === 'fill_blank') work = step.parts.map(part => typeof part === 'string' ? part : (session.fillValues?.[Number(part.blank)]?.value || '___')).join('');
-      else if (step.type === 'reorder') work = (session.order || []).map(index => step.lines[index]).join('\n');
+      else if (step.type === 'reorder' || step.type === 'pill_challenge') work = (session.order || []).map(index => step.lines[index]?.text || step.lines[index]).join('\n');
       else if (step.type === 'concept') work = step.code || '';
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'hint', track: activeTrack.name, stepType: step.type, language: step.language || activeTrack.id, prompt: step.prompt || step.text || step.takeaway, topic: step.title, code: work, output: $('#lesson-output')?.textContent || '' })
+        body: JSON.stringify({ mode: 'hint', track: activeTrack.name, stepType: why ? 'why explanation' : step.type, language: step.language || activeTrack.id, prompt: why ? `Explain briefly why this rule works: ${step.why || step.prompt || step.title}` : (step.prompt || step.text || step.takeaway), topic: step.title, code: work, output: $('#lesson-output')?.textContent || '' })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Sean could not answer right now.');
       const answer = typeof data.answer === 'string' ? { hint: data.answer, nextStep: '' } : data.answer;
       if (!answer || typeof answer.hint !== 'string') throw new Error('Sean sent an empty reply. Try once more.');
-      renderSeanReply({ hint: answer.hint, nextStep: answer.nextStep || '' });
+      renderSeanReply({ hint: answer.hint, nextStep: answer.nextStep || '' }, panelSelector);
       updateSeanMood('happy', 'I left a small hint above.');
     } catch (error) {
-      renderSeanReply({ state: 'error', hint: error.message || 'Sean could not answer right now.', nextStep: 'Your lesson is still here. You can keep working offline.' });
+      renderSeanReply({ state: 'error', hint: error.message || 'Sean could not answer right now.', nextStep: 'Your lesson is still here. You can keep working offline.' }, panelSelector);
       updateSeanMood('thinking', 'The note above explains what happened.');
     } finally {
       if (button.isConnected) {
@@ -1530,6 +1706,7 @@
     const localXp = state.xp;
     const localStreak = state.streak;
     const localDate = state.lastDate;
+    const localActivityDates = state.activityDates || [];
     const localCompleted = state.completed;
     const localNotes = state.notes;
     const localSnippets = state.snippets;
@@ -1539,6 +1716,7 @@
     state.streak = Math.max(Number(state.streak) || 0, Number(cloud.streak) || 0, Number(localStreak) || 0);
     const dates = [localDate, cloud.lastDate].filter(Boolean).sort();
     state.lastDate = dates[dates.length - 1] || null;
+    state.activityDates = [...new Set([...(Array.isArray(cloud.activityDates) ? cloud.activityDates : []), ...localActivityDates])].filter(item => /^\d{4}-\d{2}-\d{2}$/.test(item)).sort().slice(-90);
     state.completed = [...new Set([...(Array.isArray(cloud.completed) ? cloud.completed : []), ...localCompleted])];
     state.notes = [...new Set([...(Array.isArray(cloud.notes) ? cloud.notes : []), ...localNotes])];
     const localLinksCustomized = localLinks.spotify !== DEFAULTS.links.spotify || localLinks.youtube !== DEFAULTS.links.youtube;
@@ -1586,6 +1764,7 @@
       return askSean(target);
     }
     if (target.dataset.view) return setView(target.dataset.view);
+    if (target.dataset.unit !== undefined) { selectedUnit = Number(target.dataset.unit) || 0; return renderPath(); }
     if (target.dataset.trackSelect) return selectTrack(target.dataset.trackSelect);
     if (target.dataset.lesson) return launchLesson(target.dataset.lesson);
     if (target.dataset.openSandbox) {
@@ -1613,7 +1792,8 @@
       return placeChip(Number(target.dataset.chipIndex));
     }
     if (target.dataset.poolIndex !== undefined) return placeReorderLine(Number(target.dataset.poolIndex));
-    if (target.dataset.orderedPosition !== undefined) return returnReorderLine(Number(target.dataset.orderedPosition));
+    if (target.dataset.orderedPosition !== undefined) return getCurrentStep()?.type === 'pill_challenge' ? returnPill(Number(target.dataset.orderedPosition)) : returnReorderLine(Number(target.dataset.orderedPosition));
+    if (target.dataset.pillIndex !== undefined) return placePill(Number(target.dataset.pillIndex));
     if (target.dataset.loadSnippet !== undefined) {
       const saved = state.snippets.find(item => item.id === target.dataset.loadSnippet);
       if (saved) {
@@ -1656,12 +1836,24 @@
     }
     switch (target.dataset.action) {
       case 'languages': showLanguages(); break;
+      case 'install-app': installApp(); break;
       case 'theme': state.theme = state.theme === 'dark' ? 'light' : 'dark'; save(); renderStatus(); if (activeView === 'me') renderMe(); break;
+      case 'streak': renderStreak(); break;
+      case 'keep-going': setView('path'); break;
       case 'continue': nextStep(); break;
       case 'exit-lesson': setView('path'); break;
       case 'check-fill': checkFill(); break;
       case 'clear-fill': clearFill(); break;
       case 'check-reorder': checkReorder(); break;
+      case 'check-pill': checkPill(); break;
+      case 'run-pill': runCompletedPill(); break;
+      case 'why': toggleWhy(); break;
+      case 'ask-why': {
+        const panel = $('#why-panel');
+        if (panel) panel.hidden = false;
+        askSean(target, '#why-ai-reply', true);
+        break;
+      }
       case 'run': runLessonCode(); break;
       case 'run-sandbox': runSandbox(); break;
       case 'run-custom-sandbox': runCustomSandbox(); break;
@@ -1725,14 +1917,27 @@
     document.addEventListener('change', handleChange);
     document.addEventListener('keydown', handleKeydown);
     document.addEventListener('dragstart', handleChipDragStart);
+    document.addEventListener('dragstart', handlePillDragStart);
     document.addEventListener('dragover', handleChipDragOver);
+    document.addEventListener('dragover', handlePillDragOver);
     document.addEventListener('drop', handleChipDrop);
+    document.addEventListener('drop', handlePillDrop);
     document.addEventListener('dragend', clearChipDragStyles);
+    document.addEventListener('dragend', clearPillDragStyles);
     document.addEventListener('pointerdown', handleChipPointerDown);
     document.addEventListener('pointerdown', handleCodeShortcutPointerDown);
     window.addEventListener('pointermove', handleChipPointerMove, { passive: false });
     window.addEventListener('pointerup', handleChipPointerUp);
     window.addEventListener('pointercancel', handleChipPointerUp);
+    window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
+      installPrompt = event;
+    });
+    window.addEventListener('appinstalled', () => {
+      installPrompt = null;
+      if (activeView === 'me') renderMe();
+      showToast('MherielCode was installed.');
+    });
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
     restoreCloud();
   }

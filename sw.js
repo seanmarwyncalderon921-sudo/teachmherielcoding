@@ -1,13 +1,15 @@
-const CACHE_NAME = 'mherielcode-v30';
+const CACHE_NAME = 'mherielcode-v52';
 const APP_FILES = [
   './',
   './index.html',
-  './style.css?v=30',
-  './lessons.js',
-  './app.js?v=30',
-  './firebase-config.js?v=30',
-  './firebase-sync.js?v=30',
-  './manifest.json'
+  './style.css?v=48',
+  './lessons.js?v=46',
+  './app.js?v=49',
+  './usagi.png',
+  './firebase-config.js?v=46',
+  './firebase-sync.js?v=46',
+  './manifest.json',
+  './app-icon.svg'
 ];
 
 self.addEventListener('install', event => {
