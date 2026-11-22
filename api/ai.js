@@ -1,5 +1,6 @@
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+const GROQ_API_KEY = String(process.env.GROQ_API_KEY || '').trim().replace(/^['"]|['"]$/g, '');
 const LANGUAGES = new Set(['html', 'css', 'javascript', 'json', 'python']);
 const MAX_FIELD_LENGTH = 4000;
 
@@ -54,7 +55,7 @@ function validateDrill(value, requestedLanguage) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST for Sean’s coach.' });
-  if (!process.env.GROQ_API_KEY) return res.status(500).json({ error: 'Sean’s AI is not set up yet. You can still use every lesson offline.' });
+  if (!GROQ_API_KEY) return res.status(503).json({ error: 'Sean’s AI is not configured on this deployment. Add GROQ_API_KEY, then redeploy.' });
 
   try {
 
@@ -93,7 +94,7 @@ export default async function handler(req, res) {
     const response = await fetch(GROQ_ENDPOINT, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload),
