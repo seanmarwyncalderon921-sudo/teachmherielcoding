@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import aiHandler from './api/ai.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const mime = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.svg':'image/svg+xml' };
+const mime = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.svg':'image/svg+xml', '.png':'image/png' };
 
 async function loadLocalEnv() {
   for (const filename of ['.env', path.join('api', '.env')]) {
