@@ -853,6 +853,9 @@ html[data-theme="light"] {
 .pill-code-line .code-line-number { color: #687b89; font: 11px/1 "JetBrains Mono", monospace; text-align: right; }
 .token-pill, .token-tray-chip, .token-tray-slot { display: inline-flex; min-height: 32px; width: fit-content; max-width: 100%; align-items: center; padding: 6px 10px; border: 1px solid #425465; border-radius: 999px; background: #1d2a38; color: #eef8fd; font: 600 12px/1.2 "JetBrains Mono", monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .token-pill { cursor: pointer; }
+.token-pill[draggable="true"], .token-tray-chip[draggable="true"] { touch-action: none; cursor: grab; }
+.token-pill.dragging, .token-tray-chip.dragging { opacity: .35; }
+.drag-pill-ghost { position: fixed; z-index: 40; pointer-events: none; transform: translate(-50%, -50%); padding: 9px 12px; border: 1px solid var(--accent); border-radius: 999px; background: var(--surface-raised); color: var(--text); box-shadow: 0 8px 20px rgba(0,0,0,.3); font: 600 12px/1.2 "JetBrains Mono", monospace; white-space: nowrap; }
 .token-pill.fn { border-color: #6e64bd; color: #c8c2ff; }
 .token-pill.var { border-color: #258ba5; color: #92e8f5; }
 .token-pill.val { border-color: #b58145; color: #ffd391; }
@@ -1294,6 +1297,7 @@ input, textarea, select, [contenteditable="true"] {
     font-weight: 800;
     line-height: 1.15;
     text-align: center;
+    pointer-events: none;
   }
   .path-caption { display: none; }
   .node-path { margin-top: 24px; }
@@ -1369,4 +1373,8 @@ input, textarea, select, [contenteditable="true"] {
     filter: drop-shadow(0 7px 0 rgba(3, 18, 28, .45)) drop-shadow(0 10px 8px rgba(0,0,0,.25));
   }
   .path-companion .companion-message { display: none; }
+  .path-companion { pointer-events: none; }
+  .lesson-node { z-index: 4; }
+  .track-picker { display: inline-flex; }
+  .statusbar { justify-content: space-between; }
 }

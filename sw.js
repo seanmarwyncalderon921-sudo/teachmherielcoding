@@ -1,10 +1,10 @@
-const CACHE_NAME = 'mherielcode-v52';
+const CACHE_NAME = 'mherielcode-v53';
 const APP_FILES = [
   './',
   './index.html',
   './style.css?v=48',
   './lessons.js?v=46',
-  './app.js?v=49',
+  './app.js?v=50',
   './usagi.png',
   './firebase-config.js?v=46',
   './firebase-sync.js?v=46',

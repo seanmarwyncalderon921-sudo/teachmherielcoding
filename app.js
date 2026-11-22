@@ -61,6 +61,7 @@
   const firebaseConfigured = () => Boolean(window.FirebaseSync?.isFirebaseConfigured?.() || window.FirebaseSync?.configured?.());
   const makeId = prefix => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   let touchChipDrag = null;
+  let touchPillDrag = null;
   let suppressChipClickUntil = 0;
 
   function readState() {
@@ -996,6 +997,68 @@
     $$('.token-pill.dragging, [data-pill-slot].drag-over').forEach(item => item.classList.remove('dragging', 'drag-over'));
   }
 
+  function clearTouchPillDrag() {
+    if (!touchPillDrag) return;
+    touchPillDrag.source?.classList.remove('dragging');
+    touchPillDrag.over?.classList.remove('drag-over');
+    touchPillDrag.ghost?.remove();
+    touchPillDrag = null;
+  }
+
+  function handlePillPointerDown(event) {
+    if (event.pointerType === 'mouse' || getCurrentStep()?.type !== 'pill_challenge') return;
+    const source = event.target.closest('[data-pill-index], [data-pill-token]');
+    if (!source || source.disabled) return;
+    const rawIndex = source.dataset.pillIndex ?? source.dataset.pillToken;
+    const tokenIndex = Number(rawIndex);
+    if (!Number.isInteger(tokenIndex)) return;
+    touchPillDrag = { pointerId: event.pointerId, tokenIndex, source, startX: event.clientX, startY: event.clientY, started: false, over: null, ghost: null };
+    source.setPointerCapture?.(event.pointerId);
+  }
+
+  function handlePillPointerMove(event) {
+    const drag = touchPillDrag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!drag.started && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 8) return;
+    if (!drag.started) {
+      drag.started = true;
+      drag.source.classList.add('dragging');
+      const ghost = document.createElement('div');
+      ghost.className = 'drag-pill-ghost';
+      ghost.textContent = drag.source.textContent.trim();
+      document.body.append(ghost);
+      drag.ghost = ghost;
+    }
+    event.preventDefault();
+    drag.ghost.style.left = `${event.clientX}px`;
+    drag.ghost.style.top = `${event.clientY}px`;
+    const under = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-pill-slot]') || null;
+    if (drag.over !== under) {
+      drag.over?.classList.remove('drag-over');
+      drag.over = under;
+      drag.over?.classList.add('drag-over');
+    }
+  }
+
+  function handlePillPointerUp(event) {
+    const drag = touchPillDrag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.started && event.type !== 'pointercancel' && drag.over && session && !session.completed) {
+      const slotIndex = Number(drag.over.dataset.pillSlot);
+      const step = getCurrentStep();
+      if (step?.type === 'pill_challenge' && Number.isInteger(slotIndex)) {
+        const order = session.order.filter(index => index !== drag.tokenIndex);
+        order.splice(Math.min(slotIndex, order.length), 0, drag.tokenIndex);
+        session.order = order.slice(0, step.answers.length);
+        suppressChipClickUntil = Date.now() + 500;
+        clearTouchPillDrag();
+        renderLesson();
+        return;
+      }
+    }
+    clearTouchPillDrag();
+  }
+
   function returnPill(position) {
     if (!session || session.completed || session.earnedSteps.includes(session.stepIndex)) return;
     session.order.splice(position, 1);
@@ -1452,9 +1515,10 @@
       else if (step.type === 'fill_blank') work = step.parts.map(part => typeof part === 'string' ? part : (session.fillValues?.[Number(part.blank)]?.value || '___')).join('');
       else if (step.type === 'reorder' || step.type === 'pill_challenge') work = (session.order || []).map(index => step.lines[index]?.text || step.lines[index]).join('\n');
       else if (step.type === 'concept') work = step.code || '';
-      const response = await fetch('/api/ai', {
+      const response = await fetch(new URL('/api/ai', window.location.origin), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
         body: JSON.stringify({ mode: 'hint', track: activeTrack.name, stepType: why ? 'why explanation' : step.type, language: step.language || activeTrack.id, prompt: why ? `Explain briefly why this rule works: ${step.why || step.prompt || step.title}` : (step.prompt || step.text || step.takeaway), topic: step.title, code: work, output: $('#lesson-output')?.textContent || '' })
       });
       const data = await response.json().catch(() => ({}));
@@ -1500,9 +1564,10 @@
     button.setAttribute('aria-busy', 'true');
     renderSeanReply({ state: 'loading' }, '#sandbox-ai-reply');
     try {
-      const response = await fetch('/api/ai', {
+      const response = await fetch(new URL('/api/ai', window.location.origin), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
         body: JSON.stringify({
           mode: 'hint', track: `${languageName} sandbox`, stepType: 'sandbox', language,
           prompt: `Give one small, beginner-friendly hint for this ${languageName} code.`,
@@ -1532,9 +1597,10 @@
     const originalLabel = button?.textContent || '+ Extra drill';
     if (button) { button.disabled = true; button.textContent = 'Making a quick card…'; button.setAttribute('aria-busy', 'true'); }
     try {
-      const response = await fetch('/api/ai', {
+      const response = await fetch(new URL('/api/ai', window.location.origin), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
         body: JSON.stringify({ mode: 'drill', track: activeTrack.name, prompt: step.prompt || step.text, topic: step.title, language: step.language || activeTrack.id })
       });
       const data = await response.json();
@@ -1925,10 +1991,14 @@
     document.addEventListener('dragend', clearChipDragStyles);
     document.addEventListener('dragend', clearPillDragStyles);
     document.addEventListener('pointerdown', handleChipPointerDown);
+    document.addEventListener('pointerdown', handlePillPointerDown);
     document.addEventListener('pointerdown', handleCodeShortcutPointerDown);
     window.addEventListener('pointermove', handleChipPointerMove, { passive: false });
+    window.addEventListener('pointermove', handlePillPointerMove, { passive: false });
     window.addEventListener('pointerup', handleChipPointerUp);
+    window.addEventListener('pointerup', handlePillPointerUp);
     window.addEventListener('pointercancel', handleChipPointerUp);
+    window.addEventListener('pointercancel', handlePillPointerUp);
     window.addEventListener('beforeinstallprompt', event => {
       event.preventDefault();
       installPrompt = event;
